@@ -23,7 +23,8 @@ gitGraph
     checkout codex/update-deploy-gas.yml-to-include-work-branch
     commit id: "Align deploy workflow with work branch" tag: "8254914"
     checkout work
-    merge codex/update-deploy-gas.yml-to-include-work-branch tag: "99ff679 (HEAD)"
+    merge codex/update-deploy-gas.yml-to-include-work-branch tag: "99ff679"
+    commit id: "Seed src/ with Apps Script manifest + code" tag: "HEAD"
 ```
 
 ## Repository State Progression
@@ -35,7 +36,8 @@ stateDiagram-v2
     DeploymentAutomated --> GASBound: `.clasp.json` captured scriptId + rootDir
     GASBound --> WorkBranchSynced: Workflow now tracks pushes to `work`
     WorkBranchSynced --> ReadyForGASPush: Dev + CI share clasp + secrets
-    ReadyForGASPush --> Updated: `clasp push -f` + optional deploy publish latest script
+    ReadyForGASPush --> GASSourceSeeded: `src/` adds `appsscript.json` + starter `.gs`
+    GASSourceSeeded --> Updated: `clasp push -f` + optional deploy publish latest script
     Updated --> Diagrammed: README diagrams refreshed alongside commits
 ```
 
@@ -47,7 +49,7 @@ sequenceDiagram
     participant CI as deploy-gas.yml workflow
     participant Secrets as GitHub Secrets
     participant GAS as Google Apps Script
-    Dev->>Repo: Update src/, README diagrams, `.clasp.json`
+    Dev->>Repo: Update `src/appsscript.json`, `.gs` code, and README diagrams
     alt Manual workflow dispatch
         Dev->>CI: Trigger workflow_dispatch via Actions UI
     else Push to work
@@ -73,6 +75,7 @@ flowchart TD
         Workflow[.github/workflows/deploy-gas.yml]
         ClaspConfig[.clasp.json binding]
         Source[src/ Apps Script sources]
+        Manifest[appsscript.json manifest]
     end
     Secrets[GitHub Secrets\nCLASPRC_JSON + CLASP_DEPLOYMENT_ID]
     ActionsUI[GitHub Actions UI\n(workflow_dispatch)]
@@ -87,6 +90,8 @@ flowchart TD
     Workflow --> Runner
     ClaspConfig --> Runner
     Source --> ClaspConfig
+    Source --> Manifest
+    Manifest --> Runner
     Source --> Runner
     Secrets --> Runner
     ActionsUI --> Runner
@@ -99,7 +104,7 @@ flowchart TD
 flowchart LR
     subgraph User
         U1[Plan updates + branch strategy]
-        U2[Edit src/, README diagrams, `.clasp.json`]
+        U2[Edit `src/`, manifest, README diagrams, `.clasp.json`]
         U3[Push to `work` or dispatch workflow manually]
         U4[Monitor Google Apps Script results]
     end
