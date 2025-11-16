@@ -24,7 +24,8 @@ gitGraph
     commit id: "Align deploy workflow with work branch" tag: "8254914"
     checkout work
     merge codex/update-deploy-gas.yml-to-include-work-branch tag: "99ff679"
-    commit id: "Seed src/ with Apps Script manifest + code" tag: "HEAD"
+    commit id: "Seed src/ with Apps Script manifest + code" tag: "6c38270"
+    commit id: "Recreate clasp hello world entry point" tag: "HEAD"
 ```
 
 ## Repository State Progression
@@ -37,7 +38,8 @@ stateDiagram-v2
     GASBound --> WorkBranchSynced: Workflow now tracks pushes to `work`
     WorkBranchSynced --> ReadyForGASPush: Dev + CI share clasp + secrets
     ReadyForGASPush --> GASSourceSeeded: `src/` adds `appsscript.json` + starter `.gs`
-    GASSourceSeeded --> Updated: `clasp push -f` + optional deploy publish latest script
+    GASSourceSeeded --> HelloWorldReady: `clasp pull/create` re-syncs `Code.gs` hello world entry point
+    HelloWorldReady --> Updated: `clasp push -f` + optional deploy publish latest script
     Updated --> Diagrammed: README diagrams refreshed alongside commits
 ```
 
@@ -60,6 +62,9 @@ sequenceDiagram
     CI->>CI: Restore ~/.clasprc.json
     CI->>CI: Setup Node 20 & install @google/clasp
     CI->>Repo: Checkout repo files & `.clasp.json`
+    Dev->>Clasp: Run `clasp pull <scriptId>` or `clasp create --type standalone --rootDir src`
+    Clasp-->>Dev: Generate `src/appsscript.json` + starter `src/Code.gs`
+    Dev->>Repo: Commit manifest + hello-world entry point
     CI->>GAS: Run `clasp push -f`
     alt Deployment ID provided
         CI->>GAS: Run `clasp deploy --deploymentId $CLASP_DEPLOYMENT_ID`
@@ -75,9 +80,11 @@ flowchart TD
         Workflow[.github/workflows/deploy-gas.yml]
         ClaspConfig[.clasp.json binding]
         Source[src/ Apps Script sources]
+        Code[Code.gs hello world]
         Manifest[appsscript.json manifest]
     end
     Secrets[GitHub Secrets\nCLASPRC_JSON + CLASP_DEPLOYMENT_ID]
+    ClaspCLI[@google/clasp CLI\n(pull/create)]
     ActionsUI[GitHub Actions UI\n(workflow_dispatch)]
     Runner[GitHub Actions Runner + @google/clasp]
     GAS[Google Apps Script Project]
@@ -91,6 +98,11 @@ flowchart TD
     ClaspConfig --> Runner
     Source --> ClaspConfig
     Source --> Manifest
+    Source --> Code
+    Code --> ClaspCLI
+    Manifest --> ClaspCLI
+    ClaspCLI --> Contributors
+    ClaspCLI --> Runner
     Manifest --> Runner
     Source --> Runner
     Secrets --> Runner
@@ -104,9 +116,10 @@ flowchart TD
 flowchart LR
     subgraph User
         U1[Plan updates + branch strategy]
-        U2[Edit `src/`, manifest, README diagrams, `.clasp.json`]
-        U3[Push to `work` or dispatch workflow manually]
-        U4[Monitor Google Apps Script results]
+        U2[Run `clasp pull/create` to sync manifest + hello world]
+        U3[Edit `src/`, manifest, README diagrams, `.clasp.json`]
+        U4[Push to `work` or dispatch workflow manually]
+        U5[Monitor Google Apps Script results]
     end
     subgraph Frontend
         F1[Render README Mermaid diagrams for visibility]
@@ -114,11 +127,12 @@ flowchart LR
     subgraph Backend
         B1[GitHub Actions listens to `work` + workflow_dispatch]
         B2[Restore ~/.clasprc.json from CLASPRC_JSON secret]
-        B3[@google/clasp pushes/deploys GAS project]
-        B4[Google Apps Script hosts latest version]
+        B3[@google/clasp pull/create seeds manifest + `Code.gs`]
+        B4[@google/clasp pushes/deploys GAS project]
+        B5[Google Apps Script hosts latest version]
     end
-    U1 --> U2 --> U3 --> B1 --> B2 --> B3 --> B4 --> U4
-    U2 --> F1
+    U1 --> U2 --> U3 --> U4 --> B1 --> B2 --> B3 --> B4 --> B5 --> U5
+    U3 --> F1
 ```
 
 ## Maintenance Notes
