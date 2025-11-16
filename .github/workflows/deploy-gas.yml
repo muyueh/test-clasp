@@ -1,0 +1,44 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Push latest code to GAS
+    runs-on: ubuntu-latest
+    env:
+      CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+      CLASP_DEPLOYMENT_ID: ${{ secrets.CLASP_DEPLOYMENT_ID }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Restore ~/.clasprc.json
+        shell: bash
+        run: |
+          if [ -z "$CLASPRC_JSON" ]; then
+            echo "CLASPRC_JSON secret is required for clasp authentication" >&2
+            exit 1
+          fi
+          mkdir -p "$HOME"
+          echo "$CLASPRC_JSON" > "$HOME/.clasprc.json"
+          chmod 600 "$HOME/.clasprc.json"
+
+      - name: Install @google/clasp
+        run: npm install --global @google/clasp
+
+      - name: Push project to Google Apps Script
+        run: clasp push -f
+
+      - name: Deploy latest version
+        if: env.CLASP_DEPLOYMENT_ID != ''
+        run: clasp deploy --deploymentId "$CLASP_DEPLOYMENT_ID"
