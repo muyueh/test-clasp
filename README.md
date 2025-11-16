@@ -14,7 +14,12 @@ gitGraph
     commit id: "Automate GAS deploys" tag: "ad22ec6"
     checkout work
     merge codex/create-github-actions-workflow-for-gas-deployment tag: "edc5690"
-    commit id: "Track GAS binding" tag: "HEAD"
+    branch codex/create-.clasp.json-file-with-scriptid-and-rootdir
+    checkout codex/create-.clasp.json-file-with-scriptid-and-rootdir
+    commit id: "Track GAS binding" tag: "c7d1438"
+    checkout work
+    merge codex/create-.clasp.json-file-with-scriptid-and-rootdir tag: "f6d7e5e"
+    commit id: "Align deploy trigger with work" tag: "HEAD"
 ```
 
 ## Repository State Progression
@@ -37,7 +42,7 @@ sequenceDiagram
     participant CI as GitHub Actions
     participant GAS as Google Apps Script
     Dev->>Repo: Commit workflow, .clasp binding, and diagram updates
-    Repo-->>CI: Push to main triggers deploy-gas.yml
+    Repo-->>CI: Push to work triggers deploy-gas.yml
     CI->>CI: Restore ~/.clasprc.json from CLASPRC_JSON secret
     CI->>CI: npm install -g @google/clasp
     CI->>Repo: Read `.clasp.json` for scriptId/rootDir
@@ -78,7 +83,7 @@ flowchart LR
         U1[Plan updates and track git branches]
         U2[Commit README + workflow changes]
         U3[Record `.clasp.json` scriptId/rootDir]
-        U4[Push to main to trigger deploy]
+        U4[Push to work to trigger deploy]
     end
     subgraph Frontend
         F1[Render Mermaid diagrams for visibility]

@@ -3,7 +3,7 @@ name: Deploy to Google Apps Script
 on:
   push:
     branches:
-      - main
+      - work
   workflow_dispatch:
 
 jobs:
