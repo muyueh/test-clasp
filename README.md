@@ -44,7 +44,12 @@ gitGraph
     commit id: "feat: add npm-based clasp helper" tag: "170721e"
     checkout work
     merge codex/initialize-npm-and-add-clasp-dependency tag: "c0b633d"
-    commit id: "Rebuild root-level clasp hello world" tag: "HEAD"
+    commit id: "Rebuild root-level clasp hello world" tag: "6b39c3e"
+    branch codex/create-event-satisfaction-form
+    checkout codex/create-event-satisfaction-form
+    commit id: "Add event satisfaction form builder" tag: "a1b2c3d"
+    checkout work
+    merge codex/create-event-satisfaction-form tag: "HEAD"
 ```
 
 ## Repository State Progression
@@ -62,6 +67,7 @@ stateDiagram-v2
     RootHelloWorldStandalone --> SecretsCaptured: `~/.clasprc.json` is exported + saved as `CLASPRC_JSON`
     SecretsCaptured --> ActionDeploysHelloWorld: Deploy Apps Script workflow installs clasp 3.x and runs `clasp push -f`
     ActionDeploysHelloWorld --> Updated: Apps Script project + README diagrams verified together
+    Updated --> FeedbackAutomationReady: Apps Script 可以產生活動滿意度調查表單
 ```
 
 ## Contribution Sequence
@@ -74,6 +80,7 @@ sequenceDiagram
     participant CI as Deploy Apps Script (Hello World)
     participant Clasp as @google/clasp 3.x CLI
     participant GAS as Google Apps Script Project
+    participant Forms as Google Forms
     User->>OAuth: Run `clasp login --no-localhost`, open printed URL, approve scopes
     OAuth-->>User: Return auth code + allow downloading `.clasprc.json`
     User->>Secrets: Paste entire `.clasprc.json` as `CLASPRC_JSON`
@@ -90,6 +97,9 @@ sequenceDiagram
     CI->>Clasp: Install @google/clasp@^3.1.0 and run `clasp show-authorized-user`
     CI->>GAS: Run `clasp push -f` with repo-level `Code.js` + `appsscript.json`
     GAS-->>User: Run `helloWorld` inside Apps Script editor to view log output
+    User->>GAS: Execute `createEventSatisfactionForm`
+    GAS->>Forms: 使用 FormApp 建立「活動滿意度調查」
+    Forms-->>User: 傳回編輯與回覆連結
 ```
 
 ## Current Architecture Overview
@@ -100,9 +110,10 @@ flowchart TD
         Workflow[.github/workflows/deploy-gas.yml\nDeploy Apps Script (Hello World)]
         ClaspConfig[.clasp.json\nscriptId=1iIM3e...]
         Manifest[appsscript.json]
-        Code[Code.js helloWorld]
+        Code[Code.js helloWorld + createEventSatisfactionForm]
         Package[package.json + package-lock.json\n`npm run deploy`]
     end
+    FormBuilder[FormApp API\nGoogle Forms runtime]
     Secrets[GitHub Secret\nCLASPRC_JSON]
     OAuth[clasp login --no-localhost\nGoogle OAuth]
     ActionsUI[GitHub Actions UI]
@@ -124,6 +135,7 @@ flowchart TD
     ClaspConfig --> Runner
     Manifest --> ClaspCLI
     Code --> ClaspCLI
+    Code --> FormBuilder
     ClaspCLI --> Runner
     Runner --> GAS
     Secrets --> Runner
@@ -132,6 +144,8 @@ flowchart TD
     Package --> Runner
     Package --> ClaspCLI
     GAS --> Contributors
+    FormBuilder --> GAS
+    FormBuilder --> Contributors
 ```
 
 ## Swimlane Responsibilities
@@ -148,6 +162,7 @@ flowchart LR
     subgraph Frontend
         F1[README Mermaid diagrams reflect git/state/sequence/architecture/swimlane]
         F2[Actions UI shows Deploy Apps Script (Hello World) status]
+        F3[Google Form UI 提供活動滿意度填寫]
     end
     subgraph Backend
         B1[Workflow installs Node 20 + @google/clasp@^3.1.0]
@@ -155,10 +170,13 @@ flowchart LR
         B3[`clasp show-authorized-user` confirms login]
         B4[`clasp push -f` deploys `Code.js` + `appsscript.json`]
         B5[Apps Script runtime logs "Hello from Codex + GitHub Actions!"]
+        B6[`createEventSatisfactionForm` 透過 FormApp 建立表單]
     end
-    U1 --> U2 --> U3 --> U4 --> U5 --> B1 --> B2 --> B3 --> B4 --> B5 --> U6
+    U1 --> U2 --> U3 --> U4 --> U5 --> B1 --> B2 --> B3 --> B4 --> B5 --> B6 --> U6
     U4 --> F1
     U5 --> F2
+    B6 --> F3
+    U6 --> F3
 ```
 
 ## Maintenance Notes
