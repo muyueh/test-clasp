@@ -6,12 +6,12 @@ gitGraph
     commit id: "Initial commit" tag: "76f4655"
     branch codex/insert-and-update-mermaid-diagrams-in-readme
     checkout codex/insert-and-update-mermaid-diagrams-in-readme
-    commit id: "Add README diagrams" tag: "e9d2b72"
+    commit id: "Add required Mermaid diagrams to README" tag: "e9d2b72"
     checkout work
     merge codex/insert-and-update-mermaid-diagrams-in-readme tag: "9762afb"
     branch codex/create-github-actions-workflow-for-gas-deployment
     checkout codex/create-github-actions-workflow-for-gas-deployment
-    commit id: "Automate GAS deploys" tag: "ad22ec6"
+    commit id: "Automate GAS deploys via GitHub Actions" tag: "ad22ec6"
     checkout work
     merge codex/create-github-actions-workflow-for-gas-deployment tag: "edc5690"
     branch codex/create-.clasp.json-file-with-scriptid-and-rootdir
@@ -24,6 +24,11 @@ gitGraph
     commit id: "Align deploy workflow with work branch" tag: "8254914"
     checkout work
     merge codex/update-deploy-gas.yml-to-include-work-branch tag: "99ff679"
+    branch codex/update-diagrams-in-readme.md
+    checkout codex/update-diagrams-in-readme.md
+    commit id: "Update README diagrams" tag: "17e34b5"
+    checkout work
+    merge codex/update-diagrams-in-readme.md tag: "3a0f63b"
     branch codex/add-appsscript.json-and-source-files
     checkout codex/add-appsscript.json-and-source-files
     commit id: "Add Apps Script manifest and sample code" tag: "6c38270"
@@ -34,7 +39,12 @@ gitGraph
     commit id: "Sync src with clasp hello world" tag: "53e2a81"
     checkout work
     merge codex/setup-google-apps-script-project tag: "becf78b"
-    commit id: "Add npm-based clasp helper" tag: "HEAD"
+    branch codex/initialize-npm-and-add-clasp-dependency
+    checkout codex/initialize-npm-and-add-clasp-dependency
+    commit id: "feat: add npm-based clasp helper" tag: "170721e"
+    checkout work
+    merge codex/initialize-npm-and-add-clasp-dependency tag: "c0b633d"
+    commit id: "Rebuild root-level clasp hello world" tag: "HEAD"
 ```
 
 ## Repository State Progression
@@ -46,46 +56,40 @@ stateDiagram-v2
     DeploymentAutomated --> GASBound: `.clasp.json` captured scriptId + rootDir
     GASBound --> WorkBranchSynced: Workflow now tracks pushes to `work`
     WorkBranchSynced --> ReadyForGASPush: Dev + CI share clasp + secrets
-    ReadyForGASPush --> GASSourceSeeded: `src/` adds `appsscript.json` + starter `.gs`
-    GASSourceSeeded --> HelloWorldReady: `clasp pull/create` re-syncs `Code.gs` hello world entry point
-    HelloWorldReady --> NpmScriptsReady: `package.json` + lock file add @google/clasp + npm scripts
-    NpmScriptsReady --> Updated: `clasp push -f` + optional deploy publish latest script (via npm)
-    Updated --> Diagrammed: README diagrams refreshed alongside commits
+    ReadyForGASPush --> GASSourceSeeded: `appsscript.json` + hello world source tracked
+    GASSourceSeeded --> NpmScriptsReady: `package.json` + lock file add @google/clasp + npm scripts
+    NpmScriptsReady --> RootHelloWorldStandalone: `clasp create --type standalone` rebuilds repo-level `Code.js`
+    RootHelloWorldStandalone --> SecretsCaptured: `~/.clasprc.json` is exported + saved as `CLASPRC_JSON`
+    SecretsCaptured --> ActionDeploysHelloWorld: Deploy Apps Script workflow installs clasp 3.x and runs `clasp push -f`
+    ActionDeploysHelloWorld --> Updated: Apps Script project + README diagrams verified together
 ```
 
 ## Contribution Sequence
 ```mermaid
 sequenceDiagram
-    participant Dev as Contributor
-    participant Repo as GitHub Repo (work)
-    participant CI as deploy-gas.yml workflow
-    participant Secrets as GitHub Secrets
-    participant npm as npm CLI + scripts
-    participant GAS as Google Apps Script
-    participant Clasp as @google/clasp CLI
-    Dev->>Repo: Update `src/appsscript.json`, `.gs` code, and README diagrams
-    Dev->>Repo: Commit `package.json` + `package-lock.json` to version @google/clasp
-    alt Manual workflow dispatch
-        Dev->>CI: Trigger workflow_dispatch via Actions UI
+    participant User as Contributor / Operator
+    participant Repo as GitHub Repo (`work`)
+    participant OAuth as Google OAuth Consent
+    participant Secrets as GitHub Secret `CLASPRC_JSON`
+    participant CI as Deploy Apps Script (Hello World)
+    participant Clasp as @google/clasp 3.x CLI
+    participant GAS as Google Apps Script Project
+    User->>OAuth: Run `clasp login --no-localhost`, open printed URL, approve scopes
+    OAuth-->>User: Return auth code + allow downloading `.clasprc.json`
+    User->>Secrets: Paste entire `.clasprc.json` as `CLASPRC_JSON`
+    User->>Repo: `clasp create --title "Codex Hello World" --type standalone`
+    Repo-->>User: Provide `.clasp.json`, `appsscript.json`, and `Code.js`
+    User->>Clasp: Push hello world via `clasp push`
+    User->>Repo: Commit README diagrams, workflow, and hello-world sources
+    alt Manual workflow_dispatch
+        User->>CI: Trigger Deploy Apps Script (Hello World) manually
     else Push to work
-        Repo-->>CI: Push to work branch kicks off workflow
+        Repo-->>CI: Pushing to `work` auto-starts workflow
     end
-    CI->>Secrets: Fetch CLASPRC_JSON (+ optional CLASP_DEPLOYMENT_ID)
-    Secrets-->>CI: Provide clasp credentials
-    CI->>CI: Restore ~/.clasprc.json
-    CI->>npm: Run `npm install` to ensure @google/clasp is available
-    CI->>Repo: Checkout repo files & `.clasp.json`
-    Dev->>Clasp: Run `clasp pull <scriptId>` or `clasp create --type standalone --rootDir src`
-    Clasp-->>Dev: Generate `src/appsscript.json` + starter `src/Code.gs`
-    Dev->>npm: Execute `npm run deploy` locally when testing pushes
-    npm-->>Dev: Invoke local `clasp push -f`
-    Dev->>Repo: Commit manifest + hello-world entry point
-    CI->>npm: Execute `npm run deploy`
-    npm->>GAS: Run `clasp push -f`
-    alt Deployment ID provided
-        npm->>GAS: Run `clasp deploy --deploymentId $CLASP_DEPLOYMENT_ID`
-    end
-    GAS-->>Dev: Latest Apps Script version is live
+    CI->>Secrets: Expand `${{ secrets.CLASPRC_JSON }}` into `~/.clasprc.json`
+    CI->>Clasp: Install @google/clasp@^3.1.0 and run `clasp show-authorized-user`
+    CI->>GAS: Run `clasp push -f` with repo-level `Code.js` + `appsscript.json`
+    GAS-->>User: Run `helloWorld` inside Apps Script editor to view log output
 ```
 
 ## Current Architecture Overview
@@ -93,45 +97,40 @@ sequenceDiagram
 flowchart TD
     subgraph Repo
         README[README.md diagrams]
-        Workflow[.github/workflows/deploy-gas.yml]
-        ClaspConfig[.clasp.json binding]
-        Source[src/ Apps Script sources]
-        Code[Code.gs hello world]
-        Manifest[appsscript.json manifest]
-        Package[package.json + package-lock.json]
+        Workflow[.github/workflows/deploy-gas.yml\nDeploy Apps Script (Hello World)]
+        ClaspConfig[.clasp.json\nscriptId=1iIM3e...]
+        Manifest[appsscript.json]
+        Code[Code.js helloWorld]
+        Package[package.json + package-lock.json\n`npm run deploy`]
     end
-    Secrets[GitHub Secrets\nCLASPRC_JSON + CLASP_DEPLOYMENT_ID]
-    ClaspCLI[@google/clasp CLI\n(pull/create)]
-    ActionsUI[GitHub Actions UI\n(workflow_dispatch)]
-    Runner[GitHub Actions Runner + @google/clasp]
-    NpmCLI[npm CLI + scripts\n(node_modules/.bin)]
-    GAS[Google Apps Script Project]
+    Secrets[GitHub Secret\nCLASPRC_JSON]
+    OAuth[clasp login --no-localhost\nGoogle OAuth]
+    ActionsUI[GitHub Actions UI]
+    Runner[GitHub Actions Runner + Node 20]
+    ClaspCLI[@google/clasp 3.x]
+    GAS[Google Apps Script\n"Codex Hello World"]
     Contributors[Contributors & Reviewers]
+    Contributors --> OAuth
+    OAuth --> Contributors
     Contributors --> README
-    Contributors --> Source
     Contributors --> Workflow
+    Contributors --> ClaspConfig
+    Contributors --> Manifest
+    Contributors --> Code
     Contributors --> Package
     Contributors --> ActionsUI
-    Contributors --> NpmCLI
     README --> Contributors
     Workflow --> Runner
     ClaspConfig --> Runner
-    Source --> ClaspConfig
-    Source --> Manifest
-    Source --> Code
-    Code --> ClaspCLI
     Manifest --> ClaspCLI
-    ClaspCLI --> Contributors
+    Code --> ClaspCLI
     ClaspCLI --> Runner
-    Package --> NpmCLI
-    NpmCLI --> ClaspCLI
-    Manifest --> Runner
-    Source --> Runner
-    Package --> Runner
+    Runner --> GAS
     Secrets --> Runner
     ActionsUI --> Runner
-    Runner --> NpmCLI
-    Runner --> GAS
+    Runner --> ClaspCLI
+    Package --> Runner
+    Package --> ClaspCLI
     GAS --> Contributors
 ```
 
@@ -139,30 +138,31 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph User
-        U1[Plan updates + branch strategy]
-        U2[Run `clasp pull/create` to sync manifest + hello world]
-        U3[Edit `src/`, manifest, README diagrams, `.clasp.json`, npm metadata]
-        U4[Run `npm install` + `npm run deploy` locally]
-        U5[Push to `work` or dispatch workflow manually]
-        U6[Monitor Google Apps Script results]
+        U1[Enable Apps Script API + install @google/clasp@^3.1.0]
+        U2[Run `clasp login --no-localhost`, share URL + paste auth code]
+        U3[Copy `~/.clasprc.json` into GitHub secret `CLASPRC_JSON`]
+        U4[Run `clasp create` + edit `Code.js`, `appsscript.json`, README diagrams]
+        U5[Commit + push to `work` or dispatch workflow]
+        U6[Test Deploy Apps Script workflow + run `helloWorld` in Apps Script]
     end
     subgraph Frontend
-        F1[Render README Mermaid diagrams for visibility]
+        F1[README Mermaid diagrams reflect git/state/sequence/architecture/swimlane]
+        F2[Actions UI shows Deploy Apps Script (Hello World) status]
     end
     subgraph Backend
-        B1[GitHub Actions listens to `work` + workflow_dispatch]
-        B2[Restore ~/.clasprc.json from CLASPRC_JSON secret]
-        B3[@google/clasp pull/create seeds manifest + `Code.gs`]
-        B4[npm install restores @google/clasp CLI + scripts]
-        B5[`npm run deploy` pushes/deploys GAS project]
-        B6[Google Apps Script hosts latest version]
+        B1[Workflow installs Node 20 + @google/clasp@^3.1.0]
+        B2[Workflow writes `${{ secrets.CLASPRC_JSON }}` to `~/.clasprc.json`]
+        B3[`clasp show-authorized-user` confirms login]
+        B4[`clasp push -f` deploys `Code.js` + `appsscript.json`]
+        B5[Apps Script runtime logs "Hello from Codex + GitHub Actions!"]
     end
-    U1 --> U2 --> U3 --> U4 --> U5 --> B1 --> B2 --> B3 --> B4 --> B5 --> B6 --> U6
-    U3 --> F1
+    U1 --> U2 --> U3 --> U4 --> U5 --> B1 --> B2 --> B3 --> B4 --> B5 --> U6
+    U4 --> F1
+    U5 --> F2
 ```
 
 ## Maintenance Notes
-- Always keep the diagrams above synchronized with the actual repository structure, git history, and workflows whenever changes are made.
+- Always keep the diagrams above synchronized with the actual repository structure, git history, workflows, and secrets requirements whenever changes are made.
 - Update this README alongside any code or documentation changes to ensure future contributors can rely on the visual overview.
-- Verify `.github/workflows/deploy-gas.yml` continues to restore `~/.clasprc.json`, install `@google/clasp`, and run `clasp push -f` (plus optional `clasp deploy`) whenever the deployment process evolves.
-- Keep `.clasp.json` synchronized with the Apps Script project (`AKfycbxzV1ZsEhazhBugZuDUFcPRl1BDpRP70dNDO7xHe7pUm1c1XQ`) and the chosen `rootDir` (`src`).
+- Verify `.github/workflows/deploy-gas.yml` continues to restore `~/.clasprc.json`, install `@google/clasp@^3.1.0`, and run `clasp push -f` whenever the deployment process evolves.
+- Keep `.clasp.json` synchronized with the Apps Script project (`1iIM3e365Bwlswebl25oP3dgVZXpIcX25LsFh3R5vyc4DOYgXjwliK0Dg`) and the current `rootDir` (repo root).
